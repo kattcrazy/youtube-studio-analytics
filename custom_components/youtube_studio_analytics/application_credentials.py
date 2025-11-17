@@ -1,0 +1,174 @@
+"""Application credentials support for YouTube Studio Analytics."""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.helpers.network import get_url
+from homeassistant.components.application_credentials import (
+    AuthImplementation,
+    AuthorizationServer,
+    ClientCredential,
+)
+
+from .const import DOMAIN, OAUTH_AUTHORIZE_URL, OAUTH_SCOPES, OAUTH_TOKEN_URL
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class YouTubeOAuth2Implementation(AuthImplementation):
+    """Custom OAuth2 implementation for YouTube with brand channel support."""
+
+    async def async_generate_authorize_url(self, flow_id: str) -> str:
+        """Generate an authorize URL."""
+        _LOGGER.debug("Generating authorize URL for flow_id: %s", flow_id)
+
+        base_url = get_url(self.hass, prefer_external=True)
+        if not base_url:
+            base_url = get_url(self.hass, allow_internal=True)
+        if not base_url:
+            raise ValueError(
+                "Unable to determine Home Assistant URL. Please configure external or internal URL in Home Assistant settings."
+            )
+
+        redirect_uri = f"{base_url}{self.oauth_redirect_path}"
+        _LOGGER.debug("Redirect URI: %s", redirect_uri)
+
+        try:
+            # Import Flow inside function to avoid blocking import
+            from google_auth_oauthlib.flow import Flow
+            
+            # Flow.from_client_config takes only client_config and scopes
+            # redirect_uri is passed to authorization_url(), not to from_client_config
+            flow = await self.hass.async_add_executor_job(
+                Flow.from_client_config,
+                {
+                    "web": {
+                        "client_id": self.client_id,
+                        "client_secret": self.client_secret,
+                        "auth_uri": OAUTH_AUTHORIZE_URL,
+                        "token_uri": OAUTH_TOKEN_URL,
+                        "redirect_uris": [redirect_uri],
+                    }
+                },
+                OAUTH_SCOPES,
+            )
+
+            _LOGGER.debug("OAuth flow created successfully")
+
+            # Pass redirect_uri to authorization_url(), not to from_client_config
+            flow_kwargs = {
+                "redirect_uri": redirect_uri,
+                "access_type": "offline",
+                "prompt": "consent",  # Critical for brand channel support
+                "include_granted_scopes": "true",
+            }
+            _LOGGER.debug(
+                "OAuth flow kwargs: %s (prompt=consent for brand channel support)",
+                flow_kwargs,
+            )
+
+            auth_url, state = await self.hass.async_add_executor_job(
+                lambda: flow.authorization_url(**flow_kwargs)
+            )
+            _LOGGER.debug("Generated auth URL with state: %s", state)
+
+            self.hass.data.setdefault(DOMAIN, {})
+            self.hass.data[DOMAIN][f"oauth_flow_{state}"] = flow
+
+            return auth_url
+        except Exception as err:
+            _LOGGER.exception("Error generating authorize URL: %s", err)
+            raise
+
+    async def async_resolve_external_data(
+        self, external_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Resolve external data from OAuth callback."""
+        _LOGGER.debug("Resolving external data from OAuth callback")
+        code = external_data.get("code")
+        state = external_data.get("state")
+
+        if not code or not state:
+            _LOGGER.debug(
+                "Missing code or state in OAuth callback: code=%s, state=%s",
+                bool(code),
+                bool(state),
+            )
+            raise ValueError("Missing code or state in OAuth callback")
+
+        _LOGGER.debug("Looking for OAuth flow with state: %s", state)
+        flow = self.hass.data.get(DOMAIN, {}).get(f"oauth_flow_{state}")
+        if not flow:
+            _LOGGER.debug("OAuth flow not found for state: %s", state)
+            raise ValueError("OAuth flow not found")
+
+        authorization_response = external_data.get("url", "")
+        if not authorization_response:
+            base_url = get_url(self.hass, prefer_external=True)
+            if not base_url:
+                base_url = get_url(self.hass, allow_internal=True)
+            if not base_url:
+                raise ValueError(
+                    "Unable to determine Home Assistant URL. Please configure external or internal URL in Home Assistant settings."
+                )
+            redirect_uri = f"{base_url}{self.oauth_redirect_path}"
+            authorization_response = f"{redirect_uri}?code={code}&state={state}"
+
+        _LOGGER.debug("Fetching token from authorization response")
+        try:
+            from datetime import datetime
+            from google.oauth2.credentials import Credentials
+
+            token_data = await self.hass.async_add_executor_job(
+                flow.fetch_token, authorization_response=authorization_response
+            )
+
+            if not token_data or not token_data.get("refresh_token"):
+                _LOGGER.debug("No refresh token received from OAuth flow")
+                raise ValueError("No refresh token received")
+
+            refresh_token = token_data.get("refresh_token")
+            access_token = token_data.get("access_token") or token_data.get("token")
+            
+            token_expiry = None
+            if token_data.get("expires_at"):
+                token_expiry = datetime.fromtimestamp(token_data["expires_at"]).isoformat()
+            elif token_data.get("expires_in"):
+                expiry_time = datetime.utcnow().timestamp() + token_data["expires_in"]
+                token_expiry = datetime.fromtimestamp(expiry_time).isoformat()
+
+            _LOGGER.debug("Successfully received refresh token")
+            return {
+                "refresh_token": refresh_token,
+                "token": access_token,
+                "token_expiry": token_expiry,
+            }
+        except Exception as err:
+            _LOGGER.exception("Error resolving external data: %s", err)
+            raise
+
+
+async def async_get_auth_implementation(
+    hass: HomeAssistant, auth_domain: str, credential: ClientCredential
+) -> config_entry_oauth2_flow.AbstractOAuth2Implementation:
+    """Return auth implementation for a custom auth implementation."""
+    return YouTubeOAuth2Implementation(
+        hass,
+        auth_domain,
+        credential,
+        AuthorizationServer(
+            authorize_url=OAUTH_AUTHORIZE_URL, token_url=OAUTH_TOKEN_URL
+        ),
+    )
+
+
+async def async_get_description_placeholders(hass: HomeAssistant) -> dict[str, str]:
+    """Return description placeholders for the credentials dialog."""
+    return {
+        "console_url": "https://console.cloud.google.com/apis/credentials",
+    }
+

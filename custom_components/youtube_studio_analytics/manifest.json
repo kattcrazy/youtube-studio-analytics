@@ -1,0 +1,21 @@
+{
+  "domain": "youtube_studio_analytics",
+  "name": "YouTube Studio Analytics",
+  "codeowners": ["@kattcrazy"],
+  "config_flow": true,
+  "dependencies": ["application_credentials"],
+  "documentation": "https://github.com/kattcrazy/youtube-studio-analytics",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/kattcrazy/youtube-studio-analytics/issues",
+  "requirements": [
+    "google-api-python-client>=2.100.0",
+    "google-auth-httplib2>=0.1.1",
+    "google-auth-oauthlib>=1.1.0"
+  ],
+  "version": "1.0.0",
+  "import_executor": false,
+  "application_credentials": {
+    "type": "oauth2"
+  }
+}

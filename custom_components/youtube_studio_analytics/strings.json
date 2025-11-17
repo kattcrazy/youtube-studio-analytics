@@ -1,0 +1,67 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "YouTube Studio Analytics Setup",
+        "description": "Enter your OAuth 2.0 credentials from Google Cloud Console. See the README for instructions on how to obtain these.",
+        "data": {
+          "client_id": "OAuth Client ID",
+          "client_secret": "OAuth Client Secret"
+        },
+        "data_description": {
+          "client_id": "Your Google Cloud Console OAuth Client ID (ends with .apps.googleusercontent.com)",
+          "client_secret": "Your Google Cloud Console OAuth Client Secret"
+        }
+      },
+      "pick_implementation": {
+        "title": "YouTube Studio Analytics Setup",
+        "description": "Authenticate with your Google account to access YouTube Analytics data."
+      },
+      "auth": {
+        "title": "Authenticate YouTube Studio Analytics",
+        "description": "Please follow the link below and authorize access to your YouTube Analytics data. After authorization, you'll be redirected back.",
+        "description_authorize_url": "[Click here]({url}) to open the authorization website."
+      },
+      "channel_selection": {
+        "title": "Select Channel",
+        "description": "Select the YouTube channel you want to monitor. Both personal and brand channels are supported.",
+        "data": {
+          "channel_id": "Channel"
+        }
+      },
+      "options": {
+        "title": "YouTube Studio Analytics Options",
+        "description": "Configure update interval and channel settings.",
+        "data": {
+          "update_interval": "Update Interval (seconds)",
+          "channel_id": "Channel (re-authenticate to change)"
+        }
+      }
+    },
+    "error": {
+      "missing_credentials": "Please provide both Client ID and Client Secret",
+      "invalid_client_id": "Client ID must end with .apps.googleusercontent.com",
+      "oauth_error": "OAuth authentication failed",
+      "channel_not_found": "Selected channel not found",
+      "cannot_connect": "Unable to connect to YouTube API",
+      "invalid_auth": "Invalid authentication credentials",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "Integration is already configured for this account",
+      "oauth_timeout": "OAuth authorization timed out",
+      "oauth_failed": "OAuth authorization failed",
+      "oauth_implementation_unavailable": "OAuth implementation unavailable. Please check your internet connection and try again.",
+      "no_channels": "No accessible channels found for this account"
+    }
+  },
+  "options": {
+    "error": {
+      "invalid_interval": "Update interval must be between {min} and {max} seconds"
+    }
+  },
+  "application_credentials": {
+    "description": "Navigate to the [Google Cloud Console]({console_url}) to create OAuth 2.0 credentials. Create a Web application credential and add your Home Assistant URL as an authorized redirect URI. See the README for detailed instructions."
+  }
+}
+

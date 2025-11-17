@@ -1,0 +1,39 @@
+# Home Assistant
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Secrets
+*.env
+secrets.yaml
+working_code.py
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
