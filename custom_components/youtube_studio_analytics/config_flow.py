@@ -135,12 +135,11 @@ async def fetch_accessible_channels(
     return channels
 
 
-class YouTubeOAuth2FlowHandler(
-    config_entry_oauth2_flow.AbstractOAuth2FlowHandler
+class ConfigFlow(
+    config_entry_oauth2_flow.AbstractOAuth2FlowHandler, domain=DOMAIN
 ):
     """Handle OAuth2 flow for YouTube Studio Analytics."""
 
-    DOMAIN = DOMAIN
     VERSION = 1
 
     @property
