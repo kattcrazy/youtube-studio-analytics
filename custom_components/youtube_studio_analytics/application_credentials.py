@@ -23,13 +23,28 @@ class YouTubeOAuth2Implementation(AuthImplementation):
 
     async def async_generate_authorize_url(self, flow_id: str) -> str:
         """Generate an authorize URL."""
-        _LOGGER.debug("async_generate_authorize_url: Starting for flow_id: %s", flow_id)
-
-        # Use Home Assistant cloud redirect URL - no need to detect instance URL
-        # This URL must be registered in Google Cloud Console as an authorized redirect URI
-        redirect_uri = "https://my.home-assistant.io/redirect/oauth"
+        _LOGGER.info("async_generate_authorize_url: Starting for flow_id: %s", flow_id)
         
-        _LOGGER.debug("async_generate_authorize_url: Redirect URI: %s", redirect_uri)
+        try:
+            if not self.client_id:
+                _LOGGER.error("async_generate_authorize_url: Missing client_id!")
+                raise ValueError("Missing client_id")
+            
+            if not self.client_secret:
+                _LOGGER.error("async_generate_authorize_url: Missing client_secret!")
+                raise ValueError("Missing client_secret")
+            
+            _LOGGER.info("async_generate_authorize_url: Client credentials validated")
+
+            # Use Home Assistant cloud redirect URL - no need to detect instance URL
+            # This URL must be registered in Google Cloud Console as an authorized redirect URI
+            redirect_uri = "https://my.home-assistant.io/redirect/oauth"
+            
+            _LOGGER.info("async_generate_authorize_url: Redirect URI: %s", redirect_uri)
+
+        except Exception as err:
+            _LOGGER.error("async_generate_authorize_url: Error before creating flow: %s", err, exc_info=True)
+            raise
 
         try:
             # Import Flow inside function to avoid blocking import
@@ -149,15 +164,34 @@ async def async_get_auth_implementation(
     hass: HomeAssistant, auth_domain: str, credential: ClientCredential
 ) -> config_entry_oauth2_flow.AbstractOAuth2Implementation:
     """Return auth implementation for a custom auth implementation."""
-    _LOGGER.debug("async_get_auth_implementation: Creating OAuth2 implementation for domain %s", auth_domain)
-    return YouTubeOAuth2Implementation(
-        hass,
-        auth_domain,
-        credential,
-        AuthorizationServer(
-            authorize_url=OAUTH_AUTHORIZE_URL, token_url=OAUTH_TOKEN_URL
-        ),
-    )
+    _LOGGER.info("async_get_auth_implementation: Creating OAuth2 implementation for domain %s", auth_domain)
+    try:
+        if not credential:
+            _LOGGER.error("async_get_auth_implementation: No credential provided!")
+            raise ValueError("No credential provided")
+        
+        if not credential.client_id:
+            _LOGGER.error("async_get_auth_implementation: Credential missing client_id!")
+            raise ValueError("Credential missing client_id")
+        
+        if not credential.client_secret:
+            _LOGGER.error("async_get_auth_implementation: Credential missing client_secret!")
+            raise ValueError("Credential missing client_secret")
+        
+        _LOGGER.info("async_get_auth_implementation: Credential validation passed, creating implementation")
+        implementation = YouTubeOAuth2Implementation(
+            hass,
+            auth_domain,
+            credential,
+            AuthorizationServer(
+                authorize_url=OAUTH_AUTHORIZE_URL, token_url=OAUTH_TOKEN_URL
+            ),
+        )
+        _LOGGER.info("async_get_auth_implementation: OAuth2 implementation created successfully")
+        return implementation
+    except Exception as err:
+        _LOGGER.error("async_get_auth_implementation: Error creating OAuth2 implementation: %s", err, exc_info=True)
+        raise
 
 
 async def async_get_description_placeholders(hass: HomeAssistant) -> dict[str, str]:

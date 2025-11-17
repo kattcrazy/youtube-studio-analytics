@@ -50,13 +50,20 @@ Home Assistant integration for displaying YouTube Studio Analytics data as nativ
    - **User support email**: Your email address
    - **Developer contact information**: Your email address
 5. Click **"Save and Continue"**
-6. On the **"Scopes"** page, click **"Add or Remove Scopes"**
-7. Search for and add the following scopes:
-   - `https://www.googleapis.com/auth/youtube.readonly`
-   - `https://www.googleapis.com/auth/yt-analytics.readonly`
-8. Click **"Update"** then **"Save and Continue"**
-9. On the **"Test users"** page (for personal use, adding yourself as a test user is sufficient), add your Google account email
-10. Click **"Save and Continue"** through the remaining pages
+6. **CRITICAL - Add Scopes** (This step is required!):
+   - On the **"Scopes"** page, click **"Add or Remove Scopes"**
+   - Search for and add the following scopes (you must add both):
+     - `https://www.googleapis.com/auth/youtube.readonly`
+     - `https://www.googleapis.com/auth/yt-analytics.readonly`
+   - Click **"Update"** then **"Save and Continue"**
+   - **Note**: Without these scopes, the integration will fail with a 500 error!
+7. **CRITICAL - Add Test Users** (Required if app is in Testing mode):
+   - On the **"Test users"** page, click **"+ ADD USERS"**
+   - Add your Google account email address (the one you'll use to authenticate)
+   - Click **"Add"**
+   - Click **"Save and Continue"**
+   - **Note**: If your app is in Testing mode, you MUST add yourself as a test user or authentication will fail!
+8. Click **"Save and Continue"** through the remaining pages
 
 ### Step 4: Create OAuth 2.0 Credentials
 
@@ -98,10 +105,23 @@ Home Assistant integration for displaying YouTube Studio Analytics data as nativ
 7. Configure update interval (optional, default: 1 hour).
 
 ### Troubleshooting
+**500 Error when adding integration**: 
+- Make sure you've added **both required scopes** in Step 3 (OAuth consent screen)
+- Make sure you've added yourself as a **test user** if your app is in Testing mode
+- Verify your **redirect URI** matches exactly: `https://my.home-assistant.io/redirect/oauth`
+- Check Home Assistant logs for specific error messages
+
 **Missing Application Credentials**: Make sure you've added your OAuth credentials in `Settings > Applications & Services > Application Credentials` before setting up the integration.  
-**Trouble authenticating**: Make sure you select the correct Google account during OAuth (brand channels require selecting the brand account).  
+
+**Trouble authenticating**: 
+- Make sure you select the correct Google account during OAuth (brand channels require selecting the brand account)
+- Verify you added yourself as a test user if your app is in Testing mode
+- Check that both required scopes are added to your OAuth consent screen
+
 **Trouble finding channels**: Are you logged into the correct Google account?
+
 **No data appearing**: Check that your channel has analytics data available. Some metrics may take time to populate.  
+
 **Integration not updating**: Check the update interval in the integration options and ensure Home Assistant can reach YouTube's APIs.
 
 ## About

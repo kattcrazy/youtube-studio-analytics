@@ -178,15 +178,21 @@ class YouTubeOAuth2FlowHandler(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle initial step - start OAuth flow."""
-        _LOGGER.debug("async_step_user: Starting user step")
-        if self._async_current_entries():
-            _LOGGER.debug("async_step_user: Integration already configured, aborting")
-            return self.async_abort(reason="already_configured")
+        _LOGGER.info("async_step_user: Starting user step - YouTube Studio Analytics config flow")
+        try:
+            if self._async_current_entries():
+                _LOGGER.info("async_step_user: Integration already configured, aborting")
+                return self.async_abort(reason="already_configured")
 
-        _LOGGER.debug("async_step_user: Starting OAuth2 flow")
-        # Start OAuth2 flow - credentials are managed by application_credentials component
-        # The parent class will handle checking for credentials availability
-        return await self.async_step_pick_implementation()
+            _LOGGER.info("async_step_user: Starting OAuth2 flow - checking for application credentials")
+            # Start OAuth2 flow - credentials are managed by application_credentials component
+            # The parent class will handle checking for credentials availability
+            result = await self.async_step_pick_implementation()
+            _LOGGER.info("async_step_user: OAuth2 flow step completed")
+            return result
+        except Exception as err:
+            _LOGGER.error("async_step_user: Error in config flow: %s", err, exc_info=True)
+            raise
 
     async def async_oauth2_finish(self, result: dict[str, Any]) -> FlowResult:
         """Handle OAuth callback."""

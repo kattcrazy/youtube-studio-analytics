@@ -56,28 +56,37 @@ class YouTubeAnalyticsAPI:
         Raises:
             RefreshError: If token refresh fails (e.g., refresh token expired).
         """
-        _LOGGER.debug("_get_credentials: Creating fresh Credentials object with refresh token")
+        _LOGGER.info("_get_credentials: Creating fresh Credentials object with refresh token")
+        _LOGGER.debug("_get_credentials: Channel ID: %s", self.channel_id)
         # Always create credentials with None token (like the example pattern)
         # This ensures we always refresh and get a valid token for the selected channel
-        creds = Credentials(
-            token=None,  # Always None - we'll refresh to get a fresh token
-            refresh_token=self._refresh_token,
-            token_uri=OAUTH_TOKEN_URL,
-            client_id=self._client_id,
-            client_secret=self._client_secret,
-            scopes=OAUTH_SCOPES,
-        )
+        try:
+            creds = Credentials(
+                token=None,  # Always None - we'll refresh to get a fresh token
+                refresh_token=self._refresh_token,
+                token_uri=OAUTH_TOKEN_URL,
+                client_id=self._client_id,
+                client_secret=self._client_secret,
+                scopes=OAUTH_SCOPES,
+            )
+            _LOGGER.debug("_get_credentials: Credentials object created")
+        except Exception as err:
+            _LOGGER.error("_get_credentials: Failed to create Credentials object: %s", err, exc_info=True)
+            raise
         
-        _LOGGER.debug("_get_credentials: Refreshing credentials to get valid access token")
+        _LOGGER.info("_get_credentials: Refreshing credentials to get valid access token")
         try:
             # Always refresh to get a valid access token
             # This is critical for brand channel support - ensures token matches selected channel
             await self.hass.async_add_executor_job(creds.refresh, Request())
-            _LOGGER.debug("_get_credentials: Token refreshed successfully")
+            _LOGGER.info("_get_credentials: Token refreshed successfully")
         except RefreshError as err:
             _LOGGER.error(
-                "_get_credentials: Failed to refresh access token. Refresh token may have expired: %s", err
+                "_get_credentials: Failed to refresh access token. Refresh token may have expired: %s", err, exc_info=True
             )
+            raise
+        except Exception as err:
+            _LOGGER.error("_get_credentials: Unexpected error refreshing token: %s", err, exc_info=True)
             raise
         
         return creds
@@ -164,16 +173,21 @@ class YouTubeAnalyticsAPI:
                 return {"error": "Channel not found"}
                 
         except RefreshError as err:
-            _LOGGER.error("async_get_channel_statistics: Authentication failed - refresh token expired: %s", err)
+            _LOGGER.error("async_get_channel_statistics: Authentication failed - refresh token expired: %s", err, exc_info=True)
             return {"error": "auth_failed", "error_detail": str(err)}
         except HttpError as err:
-            if err.resp.status == 401:
-                _LOGGER.error("async_get_channel_statistics: Authentication failed - unauthorized: %s", err)
+            status_code = err.resp.status if hasattr(err, 'resp') and err.resp else "unknown"
+            _LOGGER.error("async_get_channel_statistics: HTTP error %s fetching channel statistics: %s", status_code, err)
+            if status_code == 401:
+                _LOGGER.error("async_get_channel_statistics: Authentication failed - unauthorized")
                 return {"error": "auth_failed", "error_detail": str(err)}
-            _LOGGER.exception("async_get_channel_statistics: HTTP error fetching channel statistics: %s", err)
-            return {"error": str(err)}
+            elif status_code == 500:
+                _LOGGER.error("async_get_channel_statistics: Server error 500 - YouTube API issue. Full error: %s", err, exc_info=True)
+                return {"error": "server_error_500", "error_detail": str(err)}
+            _LOGGER.exception("async_get_channel_statistics: HTTP error details", exc_info=True)
+            return {"error": f"http_error_{status_code}", "error_detail": str(err)}
         except Exception as err:
-            _LOGGER.exception("async_get_channel_statistics: Error fetching channel statistics: %s", err)
+            _LOGGER.error("async_get_channel_statistics: Unexpected error fetching channel statistics: %s", err, exc_info=True)
             return {"error": str(err)}
 
     async def async_get_analytics_metrics(
@@ -220,56 +234,61 @@ class YouTubeAnalyticsAPI:
             return result
             
         except RefreshError as err:
-            _LOGGER.error("async_get_analytics_metrics: Authentication failed - refresh token expired: %s", err)
+            _LOGGER.error("async_get_analytics_metrics: Authentication failed - refresh token expired: %s", err, exc_info=True)
             return {"error": "auth_failed", "error_detail": str(err)}
         except HttpError as err:
-            if err.resp.status == 401:
-                _LOGGER.error("async_get_analytics_metrics: Authentication failed - unauthorized: %s", err)
+            status_code = err.resp.status if hasattr(err, 'resp') and err.resp else "unknown"
+            _LOGGER.error("async_get_analytics_metrics: HTTP error %s fetching analytics metrics: %s", status_code, err)
+            if status_code == 401:
+                _LOGGER.error("async_get_analytics_metrics: Authentication failed - unauthorized")
                 return {"error": "auth_failed", "error_detail": str(err)}
-            _LOGGER.exception("async_get_analytics_metrics: HTTP error fetching analytics metrics: %s", err)
-            return {"error": str(err)}
+            elif status_code == 500:
+                _LOGGER.error("async_get_analytics_metrics: Server error 500 - YouTube API issue. Full error: %s", err, exc_info=True)
+                return {"error": "server_error_500", "error_detail": str(err)}
+            _LOGGER.exception("async_get_analytics_metrics: HTTP error details", exc_info=True)
+            return {"error": f"http_error_{status_code}", "error_detail": str(err)}
         except Exception as err:
-            _LOGGER.exception("async_get_analytics_metrics: Error fetching analytics metrics: %s", err)
+            _LOGGER.error("async_get_analytics_metrics: Unexpected error fetching analytics metrics: %s", err, exc_info=True)
             return {"error": str(err)}
 
     async def async_get_all_metrics(self) -> dict[str, Any]:
         """Fetch all available metrics (30-day analytics and lifetime statistics)."""
-        _LOGGER.debug("async_get_all_metrics: Starting fetch of all metrics")
+        _LOGGER.info("async_get_all_metrics: Starting fetch of all metrics for channel %s", self.channel_id)
         result: dict[str, Any] = {}
         
         try:
-            _LOGGER.debug("async_get_all_metrics: Fetching 30-day analytics")
+            _LOGGER.info("async_get_all_metrics: Fetching 30-day analytics")
             analytics_30d = await self.async_get_analytics_metrics(
                 METRICS_30D, days=ANALYTICS_DATE_RANGE_30D
             )
             
             if "error" in analytics_30d:
-                _LOGGER.warning("async_get_all_metrics: Error fetching 30-day analytics: %s", analytics_30d["error"])
+                _LOGGER.error("async_get_all_metrics: Error fetching 30-day analytics: %s", analytics_30d["error"])
                 result["error_30d"] = analytics_30d["error"]
             else:
-                _LOGGER.debug("async_get_all_metrics: Successfully fetched 30-day analytics")
+                _LOGGER.info("async_get_all_metrics: Successfully fetched 30-day analytics")
                 for key, value in analytics_30d.items():
                     if key != "error":
                         result[key] = value
             
-            _LOGGER.debug("async_get_all_metrics: Fetching channel statistics")
+            _LOGGER.info("async_get_all_metrics: Fetching channel statistics")
             channel_stats = await self.async_get_channel_statistics()
             
             if "error" in channel_stats:
-                _LOGGER.warning("async_get_all_metrics: Error fetching channel statistics: %s", channel_stats["error"])
+                _LOGGER.error("async_get_all_metrics: Error fetching channel statistics: %s", channel_stats["error"])
                 result["error_lifetime"] = channel_stats["error"]
             else:
-                _LOGGER.debug("async_get_all_metrics: Successfully fetched channel statistics")
+                _LOGGER.info("async_get_all_metrics: Successfully fetched channel statistics")
                 result["subscriber_count"] = channel_stats.get("subscriber_count", 0)
                 result["video_count"] = channel_stats.get("video_count", 0)
                 result["view_count"] = channel_stats.get("view_count", 0)
                 result["channel_title"] = channel_stats.get("channel_title", "Unknown")
             
             result["last_updated"] = datetime.now().isoformat()
-            _LOGGER.debug("async_get_all_metrics: Completed successfully")
+            _LOGGER.info("async_get_all_metrics: Completed successfully")
             
         except Exception as err:
-            _LOGGER.exception("async_get_all_metrics: Error fetching all metrics: %s", err)
+            _LOGGER.error("async_get_all_metrics: Error fetching all metrics: %s", err, exc_info=True)
             result["error"] = str(err)
         
         return result

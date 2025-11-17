@@ -21,10 +21,14 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up YouTube Studio Analytics integration."""
-    _LOGGER.debug("async_setup: Initializing YouTube Studio Analytics integration")
-    hass.data.setdefault(DOMAIN, {})
-    _LOGGER.debug("async_setup: Integration initialized")
-    return True
+    _LOGGER.info("async_setup: Initializing YouTube Studio Analytics integration")
+    try:
+        hass.data.setdefault(DOMAIN, {})
+        _LOGGER.info("async_setup: Integration initialized successfully")
+        return True
+    except Exception as err:
+        _LOGGER.error("async_setup: Error initializing integration: %s", err, exc_info=True)
+        return False
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
