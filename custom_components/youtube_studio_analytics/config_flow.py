@@ -61,7 +61,7 @@ async def create_credentials_from_oauth_result(
             expiry = None
     
     credentials = Credentials(
-        token=token,
+        token=None,  # Always None - we'll refresh to get a valid token
         refresh_token=refresh_token,
         token_uri=OAUTH_TOKEN_URL,
         client_id=credential.client_id,
@@ -70,7 +70,11 @@ async def create_credentials_from_oauth_result(
         expiry=expiry,
     )
     
-    token_expiry_str = token_expiry or (credentials.expiry.isoformat() if credentials.expiry else None)
+    # Always refresh credentials to get a valid access token (matches test_oauth_flow.py pattern)
+    from google.auth.transport.requests import Request
+    await hass.async_add_executor_job(credentials.refresh, Request())
+    
+    token_expiry_str = credentials.expiry.isoformat() if credentials.expiry else None
     
     return credentials, token_expiry_str
 
