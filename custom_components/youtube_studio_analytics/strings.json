@@ -22,11 +22,14 @@
         "description": "Please follow the link below and authorize access to your YouTube Analytics data. After authorization, you'll be redirected back.",
         "description_authorize_url": "[Click here]({url}) to open the authorization website."
       },
-      "channel_selection": {
-        "title": "Select Channel",
-        "description": "Select the YouTube channel you want to monitor. Both personal and brand channels are supported.",
+      "channel_entry": {
+        "title": "Enter Channel ID",
+        "description": "Enter your YouTube channel ID. You can find this in YouTube Studio under Settings > Channel > Advanced settings, or in your channel URL (youtube.com/channel/CHANNEL_ID). Both personal and brand channels are supported.\n\n**How to find your Channel ID:**\n1. Go to [YouTube Studio](https://studio.youtube.com)\n2. Click Settings (gear icon)\n3. Go to Channel > Advanced settings\n4. Your Channel ID is shown at the bottom\n\nOr check your channel URL: `youtube.com/channel/CHANNEL_ID`",
         "data": {
-          "channel_id": "Channel"
+          "channel_id": "Channel ID"
+        },
+        "data_description": {
+          "channel_id": "Your YouTube Channel ID (starts with 'UC' followed by 22 characters)"
         }
       },
       "options": {
@@ -42,7 +45,9 @@
       "missing_credentials": "Please provide both Client ID and Client Secret",
       "invalid_client_id": "Client ID must end with .apps.googleusercontent.com",
       "oauth_error": "OAuth authentication failed",
-      "channel_not_found": "Selected channel not found",
+      "channel_not_found": "Channel not found or not accessible. Please check that the Channel ID is correct and that you have access to this channel.",
+      "channel_id_required": "Channel ID is required",
+      "channel_validation_failed": "Failed to validate channel ID. Please check your connection and try again.",
       "cannot_connect": "Unable to connect to YouTube API",
       "invalid_auth": "Invalid authentication credentials",
       "unknown": "Unexpected error occurred"

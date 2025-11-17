@@ -5,15 +5,23 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryAuthFailed
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv, device_registry as dr
-from homeassistant.components.application_credentials import async_import_client_credential
-
-from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
-
+# Log immediately when module is imported
 _LOGGER = logging.getLogger(__name__)
+_LOGGER.info("__init__.py: Module is being imported")
+
+try:
+    from homeassistant.config_entries import ConfigEntry, ConfigEntryAuthFailed
+    from homeassistant.const import Platform
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers import config_validation as cv, device_registry as dr
+    from homeassistant.components.application_credentials import async_import_client_credential
+    
+    from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
+    
+    _LOGGER.info("__init__.py: All imports successful")
+except Exception as err:
+    _LOGGER.error("__init__.py: Import error: %s", err, exc_info=True)
+    raise
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)

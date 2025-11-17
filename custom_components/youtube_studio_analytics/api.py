@@ -63,11 +63,11 @@ class YouTubeAnalyticsAPI:
         try:
             creds = Credentials(
                 token=None,  # Always None - we'll refresh to get a fresh token
-                refresh_token=self._refresh_token,
-                token_uri=OAUTH_TOKEN_URL,
-                client_id=self._client_id,
-                client_secret=self._client_secret,
-                scopes=OAUTH_SCOPES,
+                    refresh_token=self._refresh_token,
+                    token_uri=OAUTH_TOKEN_URL,
+                    client_id=self._client_id,
+                    client_secret=self._client_secret,
+                    scopes=OAUTH_SCOPES,
             )
             _LOGGER.debug("_get_credentials: Credentials object created")
         except Exception as err:
@@ -75,16 +75,16 @@ class YouTubeAnalyticsAPI:
             raise
         
         _LOGGER.info("_get_credentials: Refreshing credentials to get valid access token")
-        try:
+                try:
             # Always refresh to get a valid access token
             # This is critical for brand channel support - ensures token matches selected channel
             await self.hass.async_add_executor_job(creds.refresh, Request())
             _LOGGER.info("_get_credentials: Token refreshed successfully")
-        except RefreshError as err:
-            _LOGGER.error(
+                except RefreshError as err:
+                    _LOGGER.error(
                 "_get_credentials: Failed to refresh access token. Refresh token may have expired: %s", err, exc_info=True
-            )
-            raise
+                    )
+                    raise
         except Exception as err:
             _LOGGER.error("_get_credentials: Unexpected error refreshing token: %s", err, exc_info=True)
             raise
@@ -100,18 +100,18 @@ class YouTubeAnalyticsAPI:
             RefreshError: If token refresh fails (e.g., refresh token expired).
         """
         _LOGGER.debug("_get_analytics_service: Building analytics service with fresh credentials")
-        # Import build inside function to avoid blocking import
-        from googleapiclient.discovery import build
-        
+            # Import build inside function to avoid blocking import
+            from googleapiclient.discovery import build
+            
         # Always get fresh credentials (they're refreshed in _get_credentials)
         # This ensures we have the correct token for the selected channel
-        credentials = await self._get_credentials()
+            credentials = await self._get_credentials()
         service = await self.hass.async_add_executor_job(
-            build,
-            "youtubeAnalytics",
-            YOUTUBE_ANALYTICS_API_VERSION,
-            credentials=credentials,
-        )
+                build,
+                "youtubeAnalytics",
+                YOUTUBE_ANALYTICS_API_VERSION,
+                credentials=credentials,
+            )
         _LOGGER.debug("_get_analytics_service: Analytics service built successfully")
         return service
 
@@ -124,18 +124,18 @@ class YouTubeAnalyticsAPI:
             RefreshError: If token refresh fails (e.g., refresh token expired).
         """
         _LOGGER.debug("_get_data_service: Building data service with fresh credentials")
-        # Import build inside function to avoid blocking import
-        from googleapiclient.discovery import build
-        
+            # Import build inside function to avoid blocking import
+            from googleapiclient.discovery import build
+            
         # Always get fresh credentials (they're refreshed in _get_credentials)
         # This ensures we have the correct token for the selected channel
-        credentials = await self._get_credentials()
+            credentials = await self._get_credentials()
         service = await self.hass.async_add_executor_job(
-            build,
-            "youtube",
-            YOUTUBE_DATA_API_VERSION,
-            credentials=credentials,
-        )
+                build,
+                "youtube",
+                YOUTUBE_DATA_API_VERSION,
+                credentials=credentials,
+            )
         _LOGGER.debug("_get_data_service: Data service built successfully")
         return service
 

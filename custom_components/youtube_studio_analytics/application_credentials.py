@@ -5,6 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+# Log immediately when module is imported
+_LOGGER = logging.getLogger(__name__)
+_LOGGER.info("application_credentials.py: Module is being imported")
+
+try:
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_entry_oauth2_flow
 from homeassistant.components.application_credentials import (
@@ -15,7 +20,10 @@ from homeassistant.components.application_credentials import (
 
 from .const import DOMAIN, OAUTH_AUTHORIZE_URL, OAUTH_SCOPES, OAUTH_TOKEN_URL
 
-_LOGGER = logging.getLogger(__name__)
+    _LOGGER.info("application_credentials.py: All imports successful")
+except Exception as err:
+    _LOGGER.error("application_credentials.py: Import error: %s", err, exc_info=True)
+    raise
 
 
 class YouTubeOAuth2Implementation(AuthImplementation):
@@ -36,10 +44,10 @@ class YouTubeOAuth2Implementation(AuthImplementation):
             
             _LOGGER.info("async_generate_authorize_url: Client credentials validated")
 
-            # Use Home Assistant cloud redirect URL - no need to detect instance URL
-            # This URL must be registered in Google Cloud Console as an authorized redirect URI
-            redirect_uri = "https://my.home-assistant.io/redirect/oauth"
-            
+        # Use Home Assistant cloud redirect URL - no need to detect instance URL
+        # This URL must be registered in Google Cloud Console as an authorized redirect URI
+        redirect_uri = "https://my.home-assistant.io/redirect/oauth"
+        
             _LOGGER.info("async_generate_authorize_url: Redirect URI: %s", redirect_uri)
 
         except Exception as err:
@@ -51,8 +59,8 @@ class YouTubeOAuth2Implementation(AuthImplementation):
             from google_auth_oauthlib.flow import Flow
             
             _LOGGER.debug("async_generate_authorize_url: Creating OAuth flow")
-            # Flow.from_client_config takes only client_config and scopes
-            # redirect_uri is passed to authorization_url(), not to from_client_config
+            # Create Flow with client config, but WITHOUT 'redirect_uris' in the config
+            # We'll set flow.redirect_uri attribute instead to avoid conflicts
             flow = await self.hass.async_add_executor_job(
                 Flow.from_client_config,
                 {
@@ -61,17 +69,19 @@ class YouTubeOAuth2Implementation(AuthImplementation):
                         "client_secret": self.client_secret,
                         "auth_uri": OAUTH_AUTHORIZE_URL,
                         "token_uri": OAUTH_TOKEN_URL,
-                        "redirect_uris": [redirect_uri],
+                        # Do NOT include "redirect_uris" here - set flow.redirect_uri instead
                     }
                 },
                 OAUTH_SCOPES,
             )
-
+            
+            # Set flow.redirect_uri attribute - this is the definitive way to tell Flow which redirect URI to use
+            flow.redirect_uri = redirect_uri
             _LOGGER.debug("async_generate_authorize_url: OAuth flow created successfully")
+            _LOGGER.debug("async_generate_authorize_url: Redirect URI set on flow object: %s", redirect_uri)
 
-            # Pass redirect_uri to authorization_url(), not to from_client_config
+            # Don't pass redirect_uri - Flow uses it from flow.redirect_uri attribute
             flow_kwargs = {
-                "redirect_uri": redirect_uri,
                 "access_type": "offline",
                 "prompt": "consent",  # Critical for brand channel support
                 "include_granted_scopes": "true",
@@ -180,13 +190,13 @@ async def async_get_auth_implementation(
         
         _LOGGER.info("async_get_auth_implementation: Credential validation passed, creating implementation")
         implementation = YouTubeOAuth2Implementation(
-            hass,
-            auth_domain,
-            credential,
-            AuthorizationServer(
-                authorize_url=OAUTH_AUTHORIZE_URL, token_url=OAUTH_TOKEN_URL
-            ),
-        )
+        hass,
+        auth_domain,
+        credential,
+        AuthorizationServer(
+            authorize_url=OAUTH_AUTHORIZE_URL, token_url=OAUTH_TOKEN_URL
+        ),
+    )
         _LOGGER.info("async_get_auth_implementation: OAuth2 implementation created successfully")
         return implementation
     except Exception as err:

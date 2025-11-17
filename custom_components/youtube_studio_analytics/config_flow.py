@@ -6,18 +6,26 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import config_entry_oauth2_flow
-
-from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, OAUTH_SCOPES, OAUTH_TOKEN_URL
-
-if TYPE_CHECKING:
-    from google.oauth2.credentials import Credentials
-
+# Log immediately when module is imported
 _LOGGER = logging.getLogger(__name__)
+_LOGGER.info("config_flow.py: Module is being imported")
+
+try:
+    from homeassistant import config_entries
+    from homeassistant.core import HomeAssistant
+    from homeassistant.data_entry_flow import FlowResult
+    from homeassistant.exceptions import HomeAssistantError
+    from homeassistant.helpers import config_entry_oauth2_flow
+    
+    from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, OAUTH_SCOPES, OAUTH_TOKEN_URL
+    
+    if TYPE_CHECKING:
+        from google.oauth2.credentials import Credentials
+    
+    _LOGGER.info("config_flow.py: All imports successful")
+except Exception as err:
+    _LOGGER.error("config_flow.py: Import error: %s", err, exc_info=True)
+    raise
 
 
 async def create_credentials_from_oauth_result(
@@ -168,11 +176,17 @@ class YouTubeOAuth2FlowHandler(
 
     def __init__(self) -> None:
         """Initialize OAuth2 flow handler."""
-        super().__init__()
-        self._channels: list[dict[str, Any]] = []
-        self._refresh_token: str | None = None
-        self._token: str | None = None
-        self._token_expiry: str | None = None
+        _LOGGER.info("YouTubeOAuth2FlowHandler.__init__: Initializing OAuth2 flow handler")
+        try:
+            super().__init__()
+            self._credentials: "Credentials" | None = None
+            self._refresh_token: str | None = None
+            self._token: str | None = None
+            self._token_expiry: str | None = None
+            _LOGGER.info("YouTubeOAuth2FlowHandler.__init__: OAuth2 flow handler initialized successfully")
+        except Exception as err:
+            _LOGGER.error("YouTubeOAuth2FlowHandler.__init__: Error initializing: %s", err, exc_info=True)
+            raise
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -232,85 +246,94 @@ class YouTubeOAuth2FlowHandler(
             self._token = token
             self._token_expiry = token_expiry_str
 
-            _LOGGER.debug("async_oauth2_finish: Fetching channels (personal and brand)")
-            self._channels = await fetch_accessible_channels(self.hass, credentials)
-
-            _LOGGER.debug("async_oauth2_finish: Found %d accessible channels", len(self._channels))
-            if not self._channels:
-                _LOGGER.warning("async_oauth2_finish: No accessible channels found")
-                return self.async_abort(reason="no_channels")
-
-            if len(self._channels) == 1:
-                _LOGGER.debug("async_oauth2_finish: Only one channel found, auto-selecting: %s", self._channels[0]["title"])
-                return await self.async_step_channel_selection(
-                    {"channel_id": self._channels[0]["id"]}
-                )
-
-            _LOGGER.debug("async_oauth2_finish: Multiple channels found, showing selection")
-            return await self.async_step_channel_selection()
+            # Store credentials for channel validation
+            self._credentials = credentials
+            
+            _LOGGER.debug("async_oauth2_finish: OAuth completed, proceeding to manual channel ID entry")
+            # Skip channel discovery (managedByMe=True has issues with brand channels)
+            # User will manually enter channel ID instead
+            return await self.async_step_channel_entry()
 
         except Exception as err:
             _LOGGER.exception("Error finishing OAuth flow: %s", err)
             return self.async_abort(reason="oauth_failed")
 
-    async def async_step_channel_selection(
+    async def async_step_channel_entry(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle channel selection step."""
-        _LOGGER.debug("async_step_channel_selection: Starting channel selection step")
+        """Handle manual channel ID entry step."""
+        _LOGGER.debug("async_step_channel_entry: Starting manual channel ID entry step")
         errors: dict[str, str] = {}
+        channel_title: str | None = None
 
         if user_input is not None:
-            _LOGGER.debug("async_step_channel_selection: User input received: %s", user_input.get("channel_id"))
-            channel_id = user_input.get("channel_id")
-            selected_channel = next(
-                (ch for ch in self._channels if ch["id"] == channel_id), None
-            )
+            channel_id = user_input.get("channel_id", "").strip()
+            _LOGGER.debug("async_step_channel_entry: User entered channel ID: %s", channel_id)
 
-            if selected_channel:
-                _LOGGER.debug("async_step_channel_selection: Channel selected: %s (%s)", selected_channel["title"], channel_id)
-                if not self._refresh_token:
-                    _LOGGER.error("async_step_channel_selection: Refresh token not available")
-                    return self.async_abort(reason="oauth_failed")
-                
-                _LOGGER.debug("async_step_channel_selection: Creating config entry")
-                # Note: client_id and client_secret are NOT stored in config entry
-                # They are retrieved from application_credentials when needed
-                return self.async_create_entry(
-                    title=f"YouTube: {selected_channel['title']}",
-                    data={
-                        "refresh_token": self._refresh_token,
-                        "token": self._token,
-                        "token_expiry": self._token_expiry,
-                        "channel_id": channel_id,
-                        "channel_title": selected_channel["title"],
-                    },
-                )
-
-            _LOGGER.warning("async_step_channel_selection: Channel not found: %s", channel_id)
-            errors["base"] = "channel_not_found"
-
-        if not self._channels:
-            _LOGGER.error("async_step_channel_selection: No channels available")
-            return self.async_abort(reason="no_channels")
+            if not channel_id:
+                errors["channel_id"] = "channel_id_required"
+            else:
+                # Validate channel ID by fetching channel info
+                try:
+                    from googleapiclient.discovery import build
+                    
+                    _LOGGER.debug("async_step_channel_entry: Validating channel ID")
+                    # Refresh credentials to ensure we have a valid token
+                    if self._credentials and hasattr(self._credentials, 'refresh'):
+                        from google.auth.transport.requests import Request
+                        await self.hass.async_add_executor_job(self._credentials.refresh, Request())
+                    
+                    service = await self.hass.async_add_executor_job(
+                        build, "youtube", "v3", credentials=self._credentials
+                    )
+                    
+                    channel_response = await self.hass.async_add_executor_job(
+                        service.channels().list(part="snippet,statistics", id=channel_id).execute
+                    )
+                    
+                    if channel_response.get("items"):
+                        channel_info = channel_response["items"][0]
+                        channel_title = channel_info["snippet"]["title"]
+                        _LOGGER.debug("async_step_channel_entry: Channel validated: %s (%s)", channel_title, channel_id)
+                        
+                        if not self._refresh_token:
+                            _LOGGER.error("async_step_channel_entry: Refresh token not available")
+                            return self.async_abort(reason="oauth_failed")
+                        
+                        _LOGGER.debug("async_step_channel_entry: Creating config entry")
+                        return self.async_create_entry(
+                            title=f"YouTube: {channel_title}",
+                            data={
+                                "refresh_token": self._refresh_token,
+                                "token": self._token,
+                                "token_expiry": self._token_expiry,
+                                "channel_id": channel_id,
+                                "channel_title": channel_title,
+                            },
+                        )
+                    else:
+                        _LOGGER.warning("async_step_channel_entry: Channel not found or not accessible: %s", channel_id)
+                        errors["channel_id"] = "channel_not_found"
+                except Exception as err:
+                    _LOGGER.exception("async_step_channel_entry: Error validating channel: %s", err)
+                    errors["channel_id"] = "channel_validation_failed"
 
         # Import voluptuous inside function to avoid blocking import
         import voluptuous as vol
 
-        _LOGGER.debug("async_step_channel_selection: Building channel selection form with %d channels", len(self._channels))
-        channel_options = {
-            channel["id"]: f"{channel['title']} ({channel['type']})"
-            for channel in self._channels
-        }
-
         data_schema = vol.Schema(
             {
-                vol.Required("channel_id"): vol.In(channel_options),
+                vol.Required("channel_id", default=user_input.get("channel_id", "") if user_input else ""): str,
             }
         )
 
+        description_placeholders = {}
+        if channel_title:
+            description_placeholders["channel_title"] = channel_title
+
         return self.async_show_form(
-            step_id="channel_selection",
+            step_id="channel_entry",
             data_schema=data_schema,
             errors=errors,
+            description_placeholders=description_placeholders,
         )
