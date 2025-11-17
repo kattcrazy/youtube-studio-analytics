@@ -158,12 +158,11 @@ class ConfigFlow(
         self._refresh_token: str | None = None
         self._token: str | None = None
         self._token_expiry: str | None = None
-        self._channel_id: str | None = None  # Store channel_id before OAuth
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle initial step - collect channel ID first."""
+        """Handle initial step - start OAuth flow first (matches test_oauth_flow.py pattern)."""
         if self._async_current_entries():
             return self.async_abort(reason="already_configured")
 
@@ -178,7 +177,7 @@ class ConfigFlow(
                 },
             )
         
-        return await self.async_step_channel_entry()
+        return await self.async_step_pick_implementation()
 
     async def async_step_reauth(
         self, entry_data: Mapping[str, Any]
@@ -223,30 +222,22 @@ class ConfigFlow(
             return self.async_abort(reason="oauth_failed")
 
         self._credentials = credentials
+        self._refresh_token = refresh_token
+        self._token = token
+        self._token_expiry = token_expiry_str
 
-        channel_id: str | None = None
         if self.source == SOURCE_REAUTH:
             reauth_entry = self._get_reauth_entry()
             channel_id = reauth_entry.data.get("channel_id")
             if not channel_id:
                 return self.async_abort(reason="oauth_failed")
-        else:
-            channel_id = self._channel_id
-            if not channel_id:
-                return self.async_abort(reason="oauth_failed")
-        
-        await self.async_set_unique_id(channel_id)
-
-        if self.source == SOURCE_REAUTH:
+            
+            await self.async_set_unique_id(channel_id)
             self._abort_if_unique_id_mismatch()
             
             try:
                 from googleapiclient.discovery import build
-                from google.auth.transport.requests import Request
                 from googleapiclient.errors import HttpError
-                
-                if self._credentials and hasattr(self._credentials, 'refresh'):
-                    await self.hass.async_add_executor_job(self._credentials.refresh, Request())
                 
                 service = await self.hass.async_add_executor_job(
                     build, "youtube", "v3", credentials=self._credentials
@@ -276,51 +267,13 @@ class ConfigFlow(
                 _LOGGER.error("Reauth failed: %s", err)
                 return self.async_abort(reason="oauth_failed")
 
-        self._abort_if_unique_id_configured()
-        
-        try:
-            from googleapiclient.discovery import build
-            from google.auth.transport.requests import Request
-            from googleapiclient.errors import HttpError
-            
-            if self._credentials and hasattr(self._credentials, 'refresh'):
-                await self.hass.async_add_executor_job(self._credentials.refresh, Request())
-            
-            service = await self.hass.async_add_executor_job(
-                build, "youtube", "v3", credentials=self._credentials
-            )
-            channel_response = await self.hass.async_add_executor_job(
-                service.channels().list(part="snippet,statistics", id=channel_id).execute
-            )
+        # For new entries: fetch accessible channels and let user pick (matches test_oauth_flow.py pattern)
+        return await self.async_step_channel_selection()
 
-            if not channel_response.get("items"):
-                _LOGGER.error("Channel not found: %s", channel_id)
-                return self.async_abort(reason="channel_not_found")
-            
-            channel_info = channel_response["items"][0]
-            channel_title = channel_info["snippet"]["title"]
-            
-            data["channel_id"] = channel_id
-            data["channel_title"] = channel_title
-            data["refresh_token"] = refresh_token
-            data["token"] = token
-            data["token_expiry"] = token_expiry_str
-            
-            return await super().async_oauth_create_entry(data)
-        except HttpError as err:
-            status_code = getattr(err.resp, "status", "unknown") if hasattr(err, "resp") else "unknown"
-            _LOGGER.error("HTTP error %s during channel validation: %s", status_code, err)
-            if status_code == 500:
-                _LOGGER.error("YouTube API returned 500 error - this is a server-side issue with YouTube's API")
-            return self.async_abort(reason="channel_validation_failed")
-        except Exception as err:
-            _LOGGER.error("Channel validation failed: %s", err)
-            return self.async_abort(reason="channel_validation_failed")
-
-    async def async_step_channel_entry(
+    async def async_step_channel_selection(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle manual channel ID entry step - BEFORE OAuth."""
+        """Handle channel selection step - AFTER OAuth (matches test_oauth_flow.py pattern)."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -329,22 +282,72 @@ class ConfigFlow(
             if not channel_id:
                 errors["channel_id"] = "channel_id_required"
             else:
-                if not (channel_id.startswith("UC") and len(channel_id) == 24):
-                    errors["channel_id"] = "channel_id_invalid_format"
-                else:
-                    self._channel_id = channel_id
-                    return await self.async_step_pick_implementation()
+                try:
+                    from googleapiclient.discovery import build
+                    from googleapiclient.errors import HttpError
+                    
+                    service = await self.hass.async_add_executor_job(
+                        build, "youtube", "v3", credentials=self._credentials
+                    )
+                    channel_response = await self.hass.async_add_executor_job(
+                        service.channels().list(part="snippet,statistics", id=channel_id).execute
+                    )
+
+                    if not channel_response.get("items"):
+                        errors["channel_id"] = "channel_not_found"
+                    else:
+                        channel_info = channel_response["items"][0]
+                        channel_title = channel_info["snippet"]["title"]
+                        
+                        await self.async_set_unique_id(channel_id)
+                        self._abort_if_unique_id_configured()
+                        
+                        data = {
+                            "channel_id": channel_id,
+                            "channel_title": channel_title,
+                            "refresh_token": self._refresh_token,
+                            "token": self._token,
+                            "token_expiry": self._token_expiry,
+                        }
+                        
+                        return await super().async_oauth_create_entry(data)
+                except HttpError as err:
+                    status_code = getattr(err.resp, "status", "unknown") if hasattr(err, "resp") else "unknown"
+                    _LOGGER.error("HTTP error %s during channel validation: %s", status_code, err)
+                    if status_code == 500:
+                        _LOGGER.error("YouTube API returned 500 error - this is a server-side issue with YouTube's API")
+                    errors["channel_id"] = "channel_validation_failed"
+                except Exception as err:
+                    _LOGGER.error("Channel validation failed: %s", err)
+                    errors["channel_id"] = "channel_validation_failed"
+
+        # Fetch accessible channels to show in dropdown
+        channels = []
+        try:
+            channels = await fetch_accessible_channels(self.hass, self._credentials)
+        except Exception as err:
+            _LOGGER.error("Failed to fetch accessible channels: %s", err)
 
         import voluptuous as vol
 
-        data_schema = vol.Schema(
-            {
-                vol.Required("channel_id", default=user_input.get("channel_id", "") if user_input else ""): str,
-            }
-        )
+        # Build schema with channel options
+        if channels:
+            channel_options = {ch["id"]: f"{ch['title']} ({ch['type']})" for ch in channels}
+            data_schema = vol.Schema(
+                {
+                    vol.Required("channel_id"): vol.In(channel_options),
+                }
+            )
+        else:
+            # Fallback to manual entry if fetching fails
+            data_schema = vol.Schema(
+                {
+                    vol.Required("channel_id", default=user_input.get("channel_id", "") if user_input else ""): str,
+                }
+            )
 
         return self.async_show_form(
-            step_id="channel_entry",
+            step_id="channel_selection",
             data_schema=data_schema,
             errors=errors,
             description_placeholders={},
