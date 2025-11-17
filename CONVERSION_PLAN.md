@@ -1,7 +1,7 @@
 # YouTube Studio Analytics - Integration Overview
 
 **Status**: ✅ Complete  
-**Last Updated**: 2025-01-16  
+**Last Updated**: 2025-01-16
 **Home Assistant Version**: 2025.11.2+
 
 ## Project Summary

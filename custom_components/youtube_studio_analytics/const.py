@@ -24,8 +24,6 @@ YOUTUBE_DATA_API_VERSION = "v3"
 
 # Update Interval (seconds)
 DEFAULT_UPDATE_INTERVAL = 3600  # 1 hour
-MIN_UPDATE_INTERVAL = 900  # 15 minutes
-MAX_UPDATE_INTERVAL = 43200  # 12 hours
 
 # Date Range (days)
 ANALYTICS_DATE_RANGE_30D = 30

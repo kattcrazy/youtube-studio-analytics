@@ -86,15 +86,18 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up YouTube Studio Analytics sensor entities."""
+    _LOGGER.debug("async_setup_entry: Starting sensor setup for entry %s", entry.entry_id)
     coordinator: YouTubeAnalyticsDataUpdateCoordinator = hass.data[DOMAIN][
         entry.entry_id
     ]["coordinator"]
     channel_id = entry.data["channel_id"]
     channel_title = entry.data.get("channel_title", "YouTube Channel")
 
+    _LOGGER.debug("async_setup_entry: Creating sensors for channel %s (%s)", channel_title, channel_id)
     entities: list[YouTubeAnalyticsSensor] = []
 
     # Create sensors for all 30-day metrics
+    _LOGGER.debug("async_setup_entry: Creating %d sensors for 30-day metrics", len(METRICS_30D))
     for metric in METRICS_30D:
         entities.append(
             YouTubeAnalyticsSensor(
@@ -107,6 +110,7 @@ async def async_setup_entry(
         )
 
     # Create sensors for all lifetime metrics
+    _LOGGER.debug("async_setup_entry: Creating %d sensors for lifetime metrics", len(METRICS_LIFETIME))
     for metric in METRICS_LIFETIME:
         entities.append(
             YouTubeAnalyticsSensor(
@@ -118,6 +122,7 @@ async def async_setup_entry(
             )
         )
 
+    _LOGGER.debug("async_setup_entry: Adding %d sensor entities", len(entities))
     async_add_entities(entities)
 
 
@@ -135,6 +140,7 @@ class YouTubeAnalyticsSensor(
         is_30d: bool,
     ) -> None:
         """Initialize the sensor."""
+        _LOGGER.debug("YouTubeAnalyticsSensor.__init__: Initializing sensor for metric %s (30d=%s)", metric_key, is_30d)
         super().__init__(coordinator)
         self._channel_id = channel_id
         self._channel_title = channel_title
@@ -154,6 +160,7 @@ class YouTubeAnalyticsSensor(
         self._attr_device_class = METRIC_DEVICE_CLASSES.get(metric_key)
         self._attr_native_unit_of_measurement = METRIC_UNITS.get(metric_key)
         self._attr_state_class = METRIC_STATE_CLASSES.get(metric_key)
+        _LOGGER.debug("YouTubeAnalyticsSensor.__init__: Sensor initialized with unique_id %s", self._attr_unique_id)
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -168,12 +175,15 @@ class YouTubeAnalyticsSensor(
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
+        _LOGGER.debug("_handle_coordinator_update: Updating sensor %s", self._attr_unique_id)
         self.async_write_ha_state()
 
     @property
     def native_value(self) -> StateType:
         """Return the native value of the sensor."""
+        _LOGGER.debug("native_value: Getting value for metric %s", self._metric_key)
         if not self.coordinator.data:
+            _LOGGER.debug("native_value: No coordinator data available")
             return None
 
         data = self.coordinator.data
@@ -184,18 +194,22 @@ class YouTubeAnalyticsSensor(
         # Handle special cases
         if self._metric_key == "estimatedMinutesWatched" and value is not None:
             # Convert minutes to hours
+            _LOGGER.debug("native_value: Converting estimatedMinutesWatched from minutes to hours")
             value = round(value / 60, 2)
 
         # Convert channel_title to string if it's the metric
         if self._metric_key == "channel_title":
+            _LOGGER.debug("native_value: Converting channel_title to string")
             return str(value) if value else None
 
         # Return None for missing values, otherwise return the value
+        _LOGGER.debug("native_value: Returning value %s for metric %s", value, self._metric_key)
         return value if value is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
+        _LOGGER.debug("extra_state_attributes: Building attributes for sensor %s", self._attr_unique_id)
         attrs: dict[str, Any] = {
             "channel_id": self._channel_id,
             "channel_name": self._channel_title,
@@ -212,4 +226,5 @@ class YouTubeAnalyticsSensor(
             if self._is_30d:
                 attrs["date_range"] = "30 days"
 
+        _LOGGER.debug("extra_state_attributes: Returning %d attributes", len(attrs))
         return attrs

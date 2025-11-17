@@ -36,6 +36,7 @@ class YouTubeAnalyticsDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]
             api_client: YouTube Analytics API client instance.
             update_interval: Update interval in seconds.
         """
+        _LOGGER.debug("YouTubeAnalyticsDataUpdateCoordinator.__init__: Initializing coordinator with interval %d seconds", update_interval)
         self.api_client = api_client
 
         super().__init__(
@@ -46,6 +47,7 @@ class YouTubeAnalyticsDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]
             update_interval=timedelta(seconds=update_interval),
             always_update=True,
         )
+        _LOGGER.debug("YouTubeAnalyticsDataUpdateCoordinator.__init__: Coordinator initialized")
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from YouTube Analytics API.
@@ -60,38 +62,43 @@ class YouTubeAnalyticsDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]
             UpdateFailed: If unable to fetch data from API.
             ConfigEntryAuthFailed: If authentication fails (token expired).
         """
+        _LOGGER.debug("_async_update_data: Starting data update")
         try:
             # Note: asyncio.TimeoutError and aiohttp.ClientError are already
             # handled by the data update coordinator.
+            _LOGGER.debug("_async_update_data: Fetching all metrics with 30 second timeout")
             async with async_timeout.timeout(30):
                 data = await self.api_client.async_get_all_metrics()
 
+                _LOGGER.debug("_async_update_data: Data received, checking for errors")
                 if "error" in data:
                     error_msg = data.get("error", "Unknown error")
                     error_detail = data.get("error_detail", "")
                     
                     if error_msg == "auth_failed":
                         _LOGGER.error(
-                            "Authentication failed. Refresh token may have expired: %s", error_detail
+                            "_async_update_data: Authentication failed. Refresh token may have expired: %s", error_detail
                         )
                         raise ConfigEntryAuthFailed(
                             f"Authentication failed: {error_detail or 'Refresh token expired'}"
                         )
                     
-                    _LOGGER.error("Error fetching YouTube Analytics data: %s", error_msg)
+                    _LOGGER.error("_async_update_data: Error fetching YouTube Analytics data: %s", error_msg)
                     raise UpdateFailed(f"Error fetching data: {error_msg}")
 
                 if not data:
-                    _LOGGER.warning("No data returned from YouTube Analytics API")
+                    _LOGGER.warning("_async_update_data: No data returned from YouTube Analytics API")
                     raise UpdateFailed("No data returned from YouTube Analytics API")
 
-                _LOGGER.debug("Successfully fetched YouTube Analytics data")
+                _LOGGER.debug("_async_update_data: Successfully fetched YouTube Analytics data")
                 return data
 
         except ConfigEntryAuthFailed:
+            _LOGGER.debug("_async_update_data: ConfigEntryAuthFailed raised, re-raising")
             raise
         except UpdateFailed:
+            _LOGGER.debug("_async_update_data: UpdateFailed raised, re-raising")
             raise
         except Exception as err:
-            _LOGGER.exception("Unexpected error fetching YouTube Analytics data: %s", err)
+            _LOGGER.exception("_async_update_data: Unexpected error fetching YouTube Analytics data: %s", err)
             raise UpdateFailed(f"Unexpected error: {err}") from err
