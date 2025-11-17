@@ -59,4 +59,3 @@ METRICS_RECENT_VIDEOS = [
     "recent_videos_total_likes_10vids",
     "recent_videos_total_comments_10vids",
 ]
-

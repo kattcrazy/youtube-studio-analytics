@@ -46,14 +46,14 @@ class YouTubeAnalyticsDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from YouTube Analytics API."""
-            async with async_timeout.timeout(30):
-                data = await self.api_client.async_get_all_metrics()
-                if "error" in data:
+        async with async_timeout.timeout(30):
+            data = await self.api_client.async_get_all_metrics()
+            if "error" in data:
                 if data.get("error") == "auth_failed":
-                        raise ConfigEntryAuthFailed(
+                    raise ConfigEntryAuthFailed(
                         f"Authentication failed: {data.get('error_detail', 'Refresh token expired')}"
-                        )
+                    )
                 raise UpdateFailed(f"Error fetching data: {data.get('error', 'Unknown error')}")
-                if not data:
-                    raise UpdateFailed("No data returned from YouTube Analytics API")
-                return data
+            if not data:
+                raise UpdateFailed("No data returned from YouTube Analytics API")
+            return data

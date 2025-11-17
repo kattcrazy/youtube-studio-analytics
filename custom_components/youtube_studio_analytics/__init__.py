@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryAuthFailed
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, device_registry as dr
@@ -26,12 +26,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up YouTube Studio Analytics from a config entry."""
     from .api import YouTubeAnalyticsAPI
     from .coordinator import YouTubeAnalyticsDataUpdateCoordinator
-    
+
     hass.data.setdefault(DOMAIN, {})
     credential = await async_import_client_credential(hass, DOMAIN)
     if not credential:
         return False
-    
+
     api_client = YouTubeAnalyticsAPI(
         hass=hass,
         refresh_token=entry.data["refresh_token"],
@@ -48,7 +48,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         update_interval=DEFAULT_UPDATE_INTERVAL,
     )
     await coordinator.async_config_entry_first_refresh()
-    
+
     channel_id = entry.data["channel_id"]
     channel_title = entry.data.get("channel_title", "YouTube Channel")
     hass.data[DOMAIN][entry.entry_id] = {

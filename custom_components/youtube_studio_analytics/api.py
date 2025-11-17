@@ -13,8 +13,6 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     ANALYTICS_DATE_RANGE_30D,
-    METRICS_30D,
-    METRICS_LIFETIME,
     OAUTH_SCOPES,
     OAUTH_TOKEN_URL,
     YOUTUBE_ANALYTICS_API_VERSION,
@@ -44,62 +42,62 @@ class YouTubeAnalyticsAPI:
 
     async def _get_credentials(self) -> Credentials:
         """Get or refresh credentials.
-        
+
         Always creates fresh credentials and refreshes to ensure brand channel support.
         Follows the pattern: create Credentials with None token, then refresh to get valid token.
-        
+
         Raises:
             RefreshError: If token refresh fails (e.g., refresh token expired).
         """
-            creds = Credentials(
+        creds = Credentials(
             token=None,
-                    refresh_token=self._refresh_token,
-                    token_uri=OAUTH_TOKEN_URL,
-                    client_id=self._client_id,
-                    client_secret=self._client_secret,
-                    scopes=OAUTH_SCOPES,
-            )
-        
-            await self.hass.async_add_executor_job(creds.refresh, Request())
-        
+            refresh_token=self._refresh_token,
+            token_uri=OAUTH_TOKEN_URL,
+            client_id=self._client_id,
+            client_secret=self._client_secret,
+            scopes=OAUTH_SCOPES,
+        )
+
+        await self.hass.async_add_executor_job(creds.refresh, Request())
+
         return creds
 
     async def _get_analytics_service(self) -> Any:
         """Get YouTube Analytics API service.
-        
+
         Always builds a fresh service with refreshed credentials to ensure brand channel support.
-        
+
         Raises:
             RefreshError: If token refresh fails (e.g., refresh token expired).
         """
-            from googleapiclient.discovery import build
-            
-            credentials = await self._get_credentials()
+        from googleapiclient.discovery import build
+
+        credentials = await self._get_credentials()
         service = await self.hass.async_add_executor_job(
-                build,
-                "youtubeAnalytics",
-                YOUTUBE_ANALYTICS_API_VERSION,
-                credentials=credentials,
-            )
+            build,
+            "youtubeAnalytics",
+            YOUTUBE_ANALYTICS_API_VERSION,
+            credentials=credentials,
+        )
         return service
 
     async def _get_data_service(self) -> Any:
         """Get YouTube Data API v3 service.
-        
+
         Always builds a fresh service with refreshed credentials to ensure brand channel support.
-        
+
         Raises:
             RefreshError: If token refresh fails (e.g., refresh token expired).
         """
-            from googleapiclient.discovery import build
-            
-            credentials = await self._get_credentials()
+        from googleapiclient.discovery import build
+
+        credentials = await self._get_credentials()
         service = await self.hass.async_add_executor_job(
-                build,
-                "youtube",
-                YOUTUBE_DATA_API_VERSION,
-                credentials=credentials,
-            )
+            build,
+            "youtube",
+            YOUTUBE_DATA_API_VERSION,
+            credentials=credentials,
+        )
         return service
 
     async def async_get_channel_statistics(self) -> dict[str, Any]:
@@ -123,7 +121,7 @@ class YouTubeAnalyticsAPI:
                     "view_count": int(stats.get("viewCount", 0)),
                     "hidden_subscriber_count": stats.get("hiddenSubscriberCount", False),
                 }
-                return {"error": "Channel not found"}
+            return {"error": "Channel not found"}
         except RefreshError as err:
             return {"error": "auth_failed", "error_detail": str(err)}
         except HttpError as err:
@@ -200,11 +198,17 @@ class YouTubeAnalyticsAPI:
             if not videos_stats.get("items"):
                 return default
             items = videos_stats["items"]
-                return {
+            return {
                 "recent_videos_count_10vids": len(items),
-                "recent_videos_total_views_10vids": sum(int(v.get("statistics", {}).get("viewCount", 0)) for v in items),
-                "recent_videos_total_likes_10vids": sum(int(v.get("statistics", {}).get("likeCount", 0)) for v in items),
-                "recent_videos_total_comments_10vids": sum(int(v.get("statistics", {}).get("commentCount", 0)) for v in items),
+                "recent_videos_total_views_10vids": sum(
+                    int(v.get("statistics", {}).get("viewCount", 0)) for v in items
+                ),
+                "recent_videos_total_likes_10vids": sum(
+                    int(v.get("statistics", {}).get("likeCount", 0)) for v in items
+                ),
+                "recent_videos_total_comments_10vids": sum(
+                    int(v.get("statistics", {}).get("commentCount", 0)) for v in items
+                ),
             }
         except RefreshError as err:
             return {"error": "auth_failed", "error_detail": str(err)}
@@ -223,23 +227,23 @@ class YouTubeAnalyticsAPI:
             "annotationClicks", "annotationClickThroughRate", "estimatedMinutesWatched",
             ]
         analytics_30d = await self.async_get_analytics_metrics(metrics_30d, days=ANALYTICS_DATE_RANGE_30D)
-            if "error" in analytics_30d:
-                result["error_30d"] = analytics_30d["error"]
-            else:
+        if "error" in analytics_30d:
+            result["error_30d"] = analytics_30d["error"]
+        else:
             result.update({f"{k}_30d": v for k, v in analytics_30d.items() if k != "error"})
-            channel_stats = await self.async_get_channel_statistics()
-            if "error" in channel_stats:
-                result["error_lifetime"] = channel_stats["error"]
-            else:
+        channel_stats = await self.async_get_channel_statistics()
+        if "error" in channel_stats:
+            result["error_lifetime"] = channel_stats["error"]
+        else:
             result.update({
                 "subscriber_count_lifetime": channel_stats.get("subscriber_count", 0),
                 "video_count_lifetime": channel_stats.get("video_count", 0),
                 "view_count_lifetime": channel_stats.get("view_count", 0),
             })
-            recent_videos = await self.async_get_recent_videos_stats()
-            if "error" in recent_videos:
-                result["error_10vids"] = recent_videos["error"]
-            else:
-                result.update(recent_videos)
-            result["last_updated"] = datetime.now().isoformat()
+        recent_videos = await self.async_get_recent_videos_stats()
+        if "error" in recent_videos:
+            result["error_10vids"] = recent_videos["error"]
+        else:
+            result.update(recent_videos)
+        result["last_updated"] = datetime.now().isoformat()
         return result

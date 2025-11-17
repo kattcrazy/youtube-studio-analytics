@@ -22,7 +22,7 @@ class YouTubeOAuth2Implementation(AuthImplementation):
         """Generate an authorize URL."""
         if not self.client_id or not self.client_secret:
             raise ValueError("Missing client credentials")
-        
+
         from google_auth_oauthlib.flow import Flow
         flow = await self.hass.async_add_executor_job(
             Flow.from_client_config,
@@ -57,7 +57,9 @@ class YouTubeOAuth2Implementation(AuthImplementation):
         flow = self.hass.data.get(DOMAIN, {}).get(f"oauth_flow_{state}")
         if not flow:
             raise ValueError("OAuth flow not found")
-        authorization_response = external_data.get("url") or f"https://my.home-assistant.io/redirect/oauth?code={code}&state={state}"
+        authorization_response = external_data.get("url") or (
+            f"https://my.home-assistant.io/redirect/oauth?code={code}&state={state}"
+        )
         from datetime import datetime
         token_data = await self.hass.async_add_executor_job(
             flow.fetch_token, authorization_response=authorization_response
@@ -97,4 +99,3 @@ async def async_get_description_placeholders(hass: HomeAssistant) -> dict[str, s
     return {
         "console_url": "https://console.cloud.google.com/apis/credentials",
     }
-

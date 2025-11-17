@@ -129,11 +129,13 @@ class YouTubeAnalyticsSensor(
         else:
             if "_lifetime" in metric_key:
                 self._attr_name = f"{channel_title} {friendly_name} (Lifetime)"
+                self._attr_unique_id = f"{channel_id}_{metric_key}"
             elif "_10vids" in metric_key:
                 self._attr_name = f"{channel_title} {friendly_name} (Last 10 Videos)"
-        else:
-            self._attr_name = f"{channel_title} {friendly_name}"
-            self._attr_unique_id = f"{channel_id}_{metric_key}"
+                self._attr_unique_id = f"{channel_id}_{metric_key}"
+            else:
+                self._attr_name = f"{channel_title} {friendly_name}"
+                self._attr_unique_id = f"{channel_id}_{metric_key}"
 
         self._attr_device_class = METRIC_DEVICE_CLASSES.get(metric_key)
         self._attr_native_unit_of_measurement = METRIC_UNITS.get(metric_key)
