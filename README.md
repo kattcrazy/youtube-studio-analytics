@@ -20,7 +20,7 @@ Home Assistant integration for displaying YouTube Studio Analytics data as nativ
 
 ## Google Cloud Console Setup
 
-**Important**: You must set up your own OAuth 2.0 credentials in Google Cloud Console. OAuth redirect URIs must exactly match your Home Assistant URL, which is unique to each installation.
+**Important**: You must set up your own OAuth 2.0 credentials in Google Cloud Console.
 
 ### Step 1: Create a Google Cloud Project
 
@@ -67,23 +67,14 @@ Home Assistant integration for displaying YouTube Studio Analytics data as nativ
 5. Enter a name for your OAuth client (e.g., "Home Assistant YouTube Analytics")
 6. Under **"Authorized redirect URIs"**, add the following:
    ```
-   http://your-ha-url/auth/external/callback
-   https://your-ha-url/auth/external/callback
+   https://my.home-assistant.io/redirect/oauth
    ```
    **Important**: 
-   - Replace `your-ha-url` with your actual Home Assistant external URL (e.g., `homeassistant.local:8123` or your domain)
-   - Add both `http://` and `https://` versions if you use both protocols
-   - The redirect URI must exactly match: `{your_ha_url}/auth/external/callback`
-   - External URL is recommended; internal URL may not work for OAuth callbacks
+   - This is the Home Assistant cloud redirect URL that handles OAuth callbacks automatically
+   - No need to configure your instance URL - the cloud service routes the callback to your instance
+   - This URL must be added exactly as shown above
 7. Click **"Create"**
 8. A dialog will appear with your **Client ID** and **Client Secret**. **Save these immediately** - you won't be able to see the secret again!
-
-### Important Notes
-
-- **Brand Channels**: When authenticating, make sure to select the correct Google account. For brand channels, select the brand account during the OAuth flow (the consent screen should show account selection).
-- **Redirect URI**: The redirect URI in your OAuth client must exactly match what Home Assistant generates. Home Assistant automatically constructs the redirect URI as: `{your_ha_url}/auth/external/callback`
-- **External URL Required**: For OAuth to work, your Home Assistant instance must be accessible from the internet. Google needs to redirect back to your Home Assistant URL after authorization.
-- **Security**: Keep your Client Secret secure. Never show others. 
 
 ## Installation (HACS)
 1. <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=kattcrazy&category=integration&repository=youtube-studio-analytics" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open your Home Assistant instance and open a repository inside the Home Assistant Community Store." /></a>

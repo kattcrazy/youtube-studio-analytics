@@ -106,7 +106,7 @@ channels().list(part='snippet', managedByMe=True)    # Brand channels
 Users provide their own OAuth credentials via Home Assistant's Application Credentials UI:
 - Client ID (from Google Cloud Console)
 - Client Secret (from Google Cloud Console)
-- Redirect URI must match the user's Home Assistant URL exactly
+- Redirect URI: `https://my.home-assistant.io/redirect/oauth` (Home Assistant cloud redirect URL)
 
 The integration uses `application_credentials` component for credential management (no hardcoded secrets).
 

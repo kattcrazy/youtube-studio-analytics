@@ -7,7 +7,6 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_entry_oauth2_flow
-from homeassistant.helpers.network import get_url
 from homeassistant.components.application_credentials import (
     AuthImplementation,
     AuthorizationServer,
@@ -26,15 +25,10 @@ class YouTubeOAuth2Implementation(AuthImplementation):
         """Generate an authorize URL."""
         _LOGGER.debug("Generating authorize URL for flow_id: %s", flow_id)
 
-        base_url = get_url(self.hass, prefer_external=True)
-        if not base_url:
-            base_url = get_url(self.hass, allow_internal=True)
-        if not base_url:
-            raise ValueError(
-                "Unable to determine Home Assistant URL. Please configure external or internal URL in Home Assistant settings."
-            )
-
-        redirect_uri = f"{base_url}{self.oauth_redirect_path}"
+        # Use Home Assistant cloud redirect URL - no need to detect instance URL
+        # This URL must be registered in Google Cloud Console as an authorized redirect URI
+        redirect_uri = "https://my.home-assistant.io/redirect/oauth"
+        
         _LOGGER.debug("Redirect URI: %s", redirect_uri)
 
         try:
@@ -108,14 +102,8 @@ class YouTubeOAuth2Implementation(AuthImplementation):
 
         authorization_response = external_data.get("url", "")
         if not authorization_response:
-            base_url = get_url(self.hass, prefer_external=True)
-            if not base_url:
-                base_url = get_url(self.hass, allow_internal=True)
-            if not base_url:
-                raise ValueError(
-                    "Unable to determine Home Assistant URL. Please configure external or internal URL in Home Assistant settings."
-                )
-            redirect_uri = f"{base_url}{self.oauth_redirect_path}"
+            # Use Home Assistant cloud redirect URL - matches what we used in authorize URL
+            redirect_uri = "https://my.home-assistant.io/redirect/oauth"
             authorization_response = f"{redirect_uri}?code={code}&state={state}"
 
         _LOGGER.debug("Fetching token from authorization response")

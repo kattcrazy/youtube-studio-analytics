@@ -9,7 +9,6 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_entry_oauth2_flow
-from homeassistant.exceptions import HomeAssistantError
 
 from .const import (
     DEFAULT_UPDATE_INTERVAL,
@@ -121,11 +120,15 @@ class YouTubeOAuth2FlowHandler(
                     refresh_token,
                     token_expiry,
                 )
-            except HomeAssistantError as err:
-                _LOGGER.error(
-                    "OAuth implementation unavailable: %s", err
-                )
-                return self.async_abort(reason="oauth_implementation_unavailable")
+            except Exception as err:
+                # Import HomeAssistantError inside except block to avoid blocking import
+                from homeassistant.exceptions import HomeAssistantError
+                if isinstance(err, HomeAssistantError):
+                    _LOGGER.error(
+                        "OAuth implementation unavailable: %s", err
+                    )
+                    return self.async_abort(reason="oauth_implementation_unavailable")
+                raise
 
             # Store tokens temporarily for use in channel selection step
             self._refresh_token = refresh_token

@@ -61,7 +61,7 @@
     }
   },
   "application_credentials": {
-    "description": "Navigate to the [Google Cloud Console]({console_url}) to create OAuth 2.0 credentials. Create a Web application credential and add your Home Assistant URL as an authorized redirect URI. See the README for detailed instructions."
+    "description": "Navigate to the [Google Cloud Console]({console_url}) to create OAuth 2.0 credentials. Create a Web application credential and add `https://my.home-assistant.io/redirect/oauth` as an authorized redirect URI. See the README for detailed instructions."
   }
 }
 
