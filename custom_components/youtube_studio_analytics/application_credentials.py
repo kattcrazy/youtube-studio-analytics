@@ -44,10 +44,10 @@ class YouTubeOAuth2Implementation(AuthImplementation):
             
             _LOGGER.info("async_generate_authorize_url: Client credentials validated")
 
-        # Use Home Assistant cloud redirect URL - no need to detect instance URL
-        # This URL must be registered in Google Cloud Console as an authorized redirect URI
-        redirect_uri = "https://my.home-assistant.io/redirect/oauth"
-        
+            # Use Home Assistant cloud redirect URL - no need to detect instance URL
+            # This URL must be registered in Google Cloud Console as an authorized redirect URI
+            redirect_uri = "https://my.home-assistant.io/redirect/oauth"
+            
             _LOGGER.info("async_generate_authorize_url: Redirect URI: %s", redirect_uri)
 
         except Exception as err:
@@ -131,9 +131,12 @@ class YouTubeOAuth2Implementation(AuthImplementation):
         authorization_response = external_data.get("url", "")
         if not authorization_response:
             # Use Home Assistant cloud redirect URL - matches what we used in authorize URL
+            # IMPORTANT: This must match EXACTLY what's registered in Google Cloud Console
             redirect_uri = "https://my.home-assistant.io/redirect/oauth"
             authorization_response = f"{redirect_uri}?code={code}&state={state}"
-            _LOGGER.debug("async_resolve_external_data: Constructed authorization response URL")
+            _LOGGER.debug("async_resolve_external_data: Constructed authorization response URL: %s", authorization_response)
+        else:
+            _LOGGER.debug("async_resolve_external_data: Using provided authorization response URL: %s", authorization_response)
 
         _LOGGER.debug("async_resolve_external_data: Fetching token from authorization response")
         try:

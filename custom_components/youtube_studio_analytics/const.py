@@ -29,28 +29,34 @@ DEFAULT_UPDATE_INTERVAL = 3600  # 1 hour
 ANALYTICS_DATE_RANGE_30D = 30
 ANALYTICS_DATE_RANGE_365D = 365
 
-# YouTube Analytics API Metrics (30-day period)
+# YouTube Analytics API Metrics (30-day period) - with _30d suffix
 METRICS_30D = [
-    "views",
-    "estimatedMinutesWatched",
-    "averageViewDuration",
-    "averageViewPercentage",
-    "likes",
-    "dislikes",
-    "comments",
-    "shares",
-    "subscribersGained",
-    "subscribersLost",
-    "annotationClicks",
-    "annotationClickThroughRate",
-    "annotationClosableImpressions",
+    "views_30d",
+    "averageViewDuration_30d",
+    "averageViewPercentage_30d",
+    "likes_30d",
+    "dislikes_30d",
+    "comments_30d",
+    "shares_30d",
+    "subscribersGained_30d",
+    "subscribersLost_30d",
+    "annotationClicks_30d",
+    "annotationClickThroughRate_30d",
+    "estimatedMinutesWatched_30d",  # Watch hours (converted from minutes)
 ]
 
-# YouTube Data API v3 Metrics (lifetime totals)
+# YouTube Data API v3 Metrics (lifetime totals) - with _lifetime suffix
 METRICS_LIFETIME = [
-    "subscriber_count",
-    "video_count",
-    "view_count",
-    "channel_title",
+    "subscriber_count_lifetime",
+    "video_count_lifetime",
+    "view_count_lifetime",
+]
+
+# Recent videos metrics (last 10 videos) - with _10vids suffix
+METRICS_RECENT_VIDEOS = [
+    "recent_videos_count_10vids",
+    "recent_videos_total_views_10vids",
+    "recent_videos_total_likes_10vids",
+    "recent_videos_total_comments_10vids",
 ]
 

@@ -17,66 +17,72 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, METRICS_30D, METRICS_LIFETIME
+from .const import DOMAIN, METRICS_30D, METRICS_LIFETIME, METRICS_RECENT_VIDEOS
 from .coordinator import YouTubeAnalyticsDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Metric name to friendly name mapping
+# Metric name to friendly name mapping (with suffixes)
 METRIC_FRIENDLY_NAMES = {
     # 30-day metrics
-    "views": "Views",
-    "estimatedMinutesWatched": "Watch Hours",
-    "averageViewDuration": "Average View Duration",
-    "averageViewPercentage": "Average View Percentage",
-    "likes": "Likes",
-    "dislikes": "Dislikes",
-    "comments": "Comments",
-    "shares": "Shares",
-    "subscribersGained": "Subscribers Gained",
-    "subscribersLost": "Subscribers Lost",
-    "annotationClicks": "Annotation Clicks",
-    "annotationClickThroughRate": "Annotation Click Through Rate",
-    "annotationClosableImpressions": "Annotation Closable Impressions",
+    "views_30d": "Views",
+    "estimatedMinutesWatched_30d": "Watch Hours",
+    "averageViewDuration_30d": "Average View Duration",
+    "averageViewPercentage_30d": "Average View Percentage",
+    "likes_30d": "Likes",
+    "dislikes_30d": "Dislikes",
+    "comments_30d": "Comments",
+    "shares_30d": "Shares",
+    "subscribersGained_30d": "Subscribers Gained",
+    "subscribersLost_30d": "Subscribers Lost",
+    "annotationClicks_30d": "Annotation Clicks",
+    "annotationClickThroughRate_30d": "Annotation Click Through Rate",
     # Lifetime metrics
-    "subscriber_count": "Subscriber Count",
-    "video_count": "Video Count",
-    "view_count": "Total Views",
-    "channel_title": "Channel Title",
+    "subscriber_count_lifetime": "Subscriber Count",
+    "video_count_lifetime": "Video Count",
+    "view_count_lifetime": "Total Views",
+    # Recent videos metrics
+    "recent_videos_count_10vids": "Recent Videos Count",
+    "recent_videos_total_views_10vids": "Recent Videos Total Views",
+    "recent_videos_total_likes_10vids": "Recent Videos Total Likes",
+    "recent_videos_total_comments_10vids": "Recent Videos Total Comments",
 }
 
 # Metric to unit mapping
 METRIC_UNITS = {
-    "estimatedMinutesWatched": "h",  # Convert minutes to hours
-    "averageViewDuration": "s",
-    "averageViewPercentage": "%",
-    "annotationClickThroughRate": "%",
+    "estimatedMinutesWatched_30d": "h",  # Convert minutes to hours
+    "averageViewDuration_30d": "s",
+    "averageViewPercentage_30d": "%",
+    "annotationClickThroughRate_30d": "%",
 }
 
 # Metric to device class mapping
 METRIC_DEVICE_CLASSES = {
-    "estimatedMinutesWatched": SensorDeviceClass.DURATION,
-    "averageViewDuration": SensorDeviceClass.DURATION,
+    "estimatedMinutesWatched_30d": SensorDeviceClass.DURATION,
+    "averageViewDuration_30d": SensorDeviceClass.DURATION,
 }
 
 # Metric to state class mapping
 METRIC_STATE_CLASSES = {
-    "views": SensorStateClass.TOTAL_INCREASING,
-    "estimatedMinutesWatched": SensorStateClass.TOTAL_INCREASING,
-    "averageViewDuration": SensorStateClass.MEASUREMENT,
-    "averageViewPercentage": SensorStateClass.MEASUREMENT,
-    "likes": SensorStateClass.TOTAL_INCREASING,
-    "dislikes": SensorStateClass.TOTAL_INCREASING,
-    "comments": SensorStateClass.TOTAL_INCREASING,
-    "shares": SensorStateClass.TOTAL_INCREASING,
-    "subscribersGained": SensorStateClass.TOTAL_INCREASING,
-    "subscribersLost": SensorStateClass.TOTAL_INCREASING,
-    "annotationClicks": SensorStateClass.TOTAL_INCREASING,
-    "annotationClickThroughRate": SensorStateClass.MEASUREMENT,
-    "annotationClosableImpressions": SensorStateClass.TOTAL_INCREASING,
-    "subscriber_count": SensorStateClass.MEASUREMENT,
-    "video_count": SensorStateClass.TOTAL_INCREASING,
-    "view_count": SensorStateClass.TOTAL_INCREASING,
+    "views_30d": SensorStateClass.TOTAL_INCREASING,
+    "estimatedMinutesWatched_30d": SensorStateClass.TOTAL_INCREASING,
+    "averageViewDuration_30d": SensorStateClass.MEASUREMENT,
+    "averageViewPercentage_30d": SensorStateClass.MEASUREMENT,
+    "likes_30d": SensorStateClass.TOTAL_INCREASING,
+    "dislikes_30d": SensorStateClass.TOTAL_INCREASING,
+    "comments_30d": SensorStateClass.TOTAL_INCREASING,
+    "shares_30d": SensorStateClass.TOTAL_INCREASING,
+    "subscribersGained_30d": SensorStateClass.TOTAL_INCREASING,
+    "subscribersLost_30d": SensorStateClass.TOTAL_INCREASING,
+    "annotationClicks_30d": SensorStateClass.TOTAL_INCREASING,
+    "annotationClickThroughRate_30d": SensorStateClass.MEASUREMENT,
+    "subscriber_count_lifetime": SensorStateClass.MEASUREMENT,
+    "video_count_lifetime": SensorStateClass.TOTAL_INCREASING,
+    "view_count_lifetime": SensorStateClass.TOTAL_INCREASING,
+    "recent_videos_count_10vids": SensorStateClass.MEASUREMENT,
+    "recent_videos_total_views_10vids": SensorStateClass.TOTAL_INCREASING,
+    "recent_videos_total_likes_10vids": SensorStateClass.TOTAL_INCREASING,
+    "recent_videos_total_comments_10vids": SensorStateClass.TOTAL_INCREASING,
 }
 
 
@@ -122,6 +128,19 @@ async def async_setup_entry(
             )
         )
 
+    # Create sensors for recent videos metrics
+    _LOGGER.debug("async_setup_entry: Creating %d sensors for recent videos metrics", len(METRICS_RECENT_VIDEOS))
+    for metric in METRICS_RECENT_VIDEOS:
+        entities.append(
+            YouTubeAnalyticsSensor(
+                coordinator=coordinator,
+                channel_id=channel_id,
+                channel_title=channel_title,
+                metric_key=metric,
+                is_30d=False,
+            )
+        )
+
     _LOGGER.debug("async_setup_entry: Adding %d sensor entities", len(entities))
     async_add_entities(entities)
 
@@ -151,7 +170,13 @@ class YouTubeAnalyticsSensor(
         friendly_name = METRIC_FRIENDLY_NAMES.get(metric_key, metric_key)
         if is_30d:
             self._attr_name = f"{channel_title} {friendly_name} (30 days)"
-            self._attr_unique_id = f"{channel_id}_{metric_key}_30d"
+            self._attr_unique_id = f"{channel_id}_{metric_key}"
+        else:
+            # For lifetime and recent videos metrics, suffix is already in metric_key
+            if "_lifetime" in metric_key:
+                self._attr_name = f"{channel_title} {friendly_name} (Lifetime)"
+            elif "_10vids" in metric_key:
+                self._attr_name = f"{channel_title} {friendly_name} (Last 10 Videos)"
         else:
             self._attr_name = f"{channel_title} {friendly_name}"
             self._attr_unique_id = f"{channel_id}_{metric_key}"
@@ -192,15 +217,10 @@ class YouTubeAnalyticsSensor(
         value = data.get(self._metric_key)
 
         # Handle special cases
-        if self._metric_key == "estimatedMinutesWatched" and value is not None:
+        if self._metric_key == "estimatedMinutesWatched_30d" and value is not None:
             # Convert minutes to hours
-            _LOGGER.debug("native_value: Converting estimatedMinutesWatched from minutes to hours")
+            _LOGGER.debug("native_value: Converting estimatedMinutesWatched_30d from minutes to hours")
             value = round(value / 60, 2)
-
-        # Convert channel_title to string if it's the metric
-        if self._metric_key == "channel_title":
-            _LOGGER.debug("native_value: Converting channel_title to string")
-            return str(value) if value else None
 
         # Return None for missing values, otherwise return the value
         _LOGGER.debug("native_value: Returning value %s for metric %s", value, self._metric_key)
@@ -225,6 +245,10 @@ class YouTubeAnalyticsSensor(
             # Add date range for 30-day metrics
             if self._is_30d:
                 attrs["date_range"] = "30 days"
+            elif "_10vids" in self._metric_key:
+                attrs["date_range"] = "Last 10 videos by upload date"
+            elif "_lifetime" in self._metric_key:
+                attrs["date_range"] = "Lifetime"
 
         _LOGGER.debug("extra_state_attributes: Returning %d attributes", len(attrs))
         return attrs

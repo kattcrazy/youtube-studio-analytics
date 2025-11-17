@@ -32,6 +32,10 @@
           "channel_id": "Your YouTube Channel ID (starts with 'UC' followed by 22 characters)"
         }
       },
+      "reauth_confirm": {
+        "title": "[%key:common::config_flow::title::reauth%]",
+        "description": "The YouTube Studio Analytics integration needs to re-authenticate your account"
+      },
       "options": {
         "title": "YouTube Studio Analytics Options",
         "description": "Configure update interval and channel settings.",
@@ -47,6 +51,7 @@
       "oauth_error": "OAuth authentication failed",
       "channel_not_found": "Channel not found or not accessible. Please check that the Channel ID is correct and that you have access to this channel.",
       "channel_id_required": "Channel ID is required",
+      "channel_id_invalid_format": "Channel ID must start with 'UC' and be 24 characters long",
       "channel_validation_failed": "Failed to validate channel ID. Please check your connection and try again.",
       "cannot_connect": "Unable to connect to YouTube API",
       "invalid_auth": "Invalid authentication credentials",
@@ -57,7 +62,9 @@
       "oauth_timeout": "OAuth authorization timed out",
       "oauth_failed": "OAuth authorization failed",
       "oauth_implementation_unavailable": "OAuth implementation unavailable. Please check your internet connection and try again.",
-      "no_channels": "No accessible channels found for this account"
+      "no_channels": "No accessible channels found for this account",
+      "missing_credentials": "Application credentials not found. Please add your OAuth credentials to /config/application_credentials.json with the key '{domain}'. See the README for instructions.",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]"
     }
   },
   "options": {

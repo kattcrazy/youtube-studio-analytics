@@ -87,7 +87,7 @@ class YouTubeAnalyticsAPI:
                     raise
         except Exception as err:
             _LOGGER.error("_get_credentials: Unexpected error refreshing token: %s", err, exc_info=True)
-            raise
+                    raise
         
         return creds
 
@@ -251,15 +251,102 @@ class YouTubeAnalyticsAPI:
             _LOGGER.error("async_get_analytics_metrics: Unexpected error fetching analytics metrics: %s", err, exc_info=True)
             return {"error": str(err)}
 
+    async def async_get_recent_videos_stats(self) -> dict[str, Any]:
+        """Fetch statistics for the last 10 videos."""
+        _LOGGER.debug("async_get_recent_videos_stats: Starting fetch for channel %s", self.channel_id)
+        try:
+            service = await self._get_data_service()
+            _LOGGER.debug("async_get_recent_videos_stats: Fetching last 10 videos")
+            
+            # Get last 10 videos by upload date
+            videos_response = await self.hass.async_add_executor_job(
+                service.search().list(
+                    part="snippet",
+                    channelId=self.channel_id,
+                    type="video",
+                    order="date",
+                    maxResults=10,
+                ).execute
+            )
+            
+            if "items" not in videos_response or not videos_response["items"]:
+                _LOGGER.warning("async_get_recent_videos_stats: No recent videos found")
+                return {
+                    "recent_videos_count_10vids": 0,
+                    "recent_videos_total_views_10vids": 0,
+                    "recent_videos_total_likes_10vids": 0,
+                    "recent_videos_total_comments_10vids": 0,
+                }
+            
+            video_ids = [item["id"]["videoId"] for item in videos_response["items"]]
+            _LOGGER.debug("async_get_recent_videos_stats: Found %d videos, fetching statistics", len(video_ids))
+            
+            videos_stats = await self.hass.async_add_executor_job(
+                service.videos().list(
+                    part="statistics",
+                    id=",".join(video_ids),
+                ).execute
+            )
+            
+            if "items" not in videos_stats:
+                _LOGGER.warning("async_get_recent_videos_stats: No video statistics returned")
+                return {
+                    "recent_videos_count_10vids": 0,
+                    "recent_videos_total_views_10vids": 0,
+                    "recent_videos_total_likes_10vids": 0,
+                    "recent_videos_total_comments_10vids": 0,
+                }
+            
+            total_views = sum(int(v.get("statistics", {}).get("viewCount", 0)) for v in videos_stats["items"])
+            total_likes = sum(int(v.get("statistics", {}).get("likeCount", 0)) for v in videos_stats["items"])
+            total_comments = sum(int(v.get("statistics", {}).get("commentCount", 0)) for v in videos_stats["items"])
+            
+            result = {
+                "recent_videos_count_10vids": len(videos_stats["items"]),
+                "recent_videos_total_views_10vids": total_views,
+                "recent_videos_total_likes_10vids": total_likes,
+                "recent_videos_total_comments_10vids": total_comments,
+            }
+            
+            _LOGGER.debug("async_get_recent_videos_stats: Successfully fetched recent videos stats")
+            return result
+            
+        except RefreshError as err:
+            _LOGGER.error("async_get_recent_videos_stats: Authentication failed: %s", err, exc_info=True)
+            return {"error": "auth_failed", "error_detail": str(err)}
+        except HttpError as err:
+            status_code = err.resp.status if hasattr(err, 'resp') and err.resp else "unknown"
+            _LOGGER.error("async_get_recent_videos_stats: HTTP error %s: %s", status_code, err)
+            return {"error": f"http_error_{status_code}", "error_detail": str(err)}
+        except Exception as err:
+            _LOGGER.error("async_get_recent_videos_stats: Unexpected error: %s", err, exc_info=True)
+            return {"error": str(err)}
+
     async def async_get_all_metrics(self) -> dict[str, Any]:
-        """Fetch all available metrics (30-day analytics and lifetime statistics)."""
+        """Fetch all available metrics (30-day analytics, lifetime statistics, and recent videos)."""
         _LOGGER.info("async_get_all_metrics: Starting fetch of all metrics for channel %s", self.channel_id)
         result: dict[str, Any] = {}
         
         try:
+            # Fetch 30-day analytics with selected metrics only
             _LOGGER.info("async_get_all_metrics: Fetching 30-day analytics")
+            metrics_30d_selected = [
+                "views",
+                "averageViewDuration",
+                "averageViewPercentage",
+                "likes",
+                "dislikes",
+                "comments",
+                "shares",
+                "subscribersGained",
+                "subscribersLost",
+                "annotationClicks",
+                "annotationClickThroughRate",
+                "estimatedMinutesWatched",  # For watch hours
+            ]
+            
             analytics_30d = await self.async_get_analytics_metrics(
-                METRICS_30D, days=ANALYTICS_DATE_RANGE_30D
+                metrics_30d_selected, days=ANALYTICS_DATE_RANGE_30D
             )
             
             if "error" in analytics_30d:
@@ -267,10 +354,12 @@ class YouTubeAnalyticsAPI:
                 result["error_30d"] = analytics_30d["error"]
             else:
                 _LOGGER.info("async_get_all_metrics: Successfully fetched 30-day analytics")
+                # Add _30d suffix to all 30-day metrics
                 for key, value in analytics_30d.items():
                     if key != "error":
-                        result[key] = value
+                        result[f"{key}_30d"] = value
             
+            # Fetch channel statistics (lifetime)
             _LOGGER.info("async_get_all_metrics: Fetching channel statistics")
             channel_stats = await self.async_get_channel_statistics()
             
@@ -279,10 +368,20 @@ class YouTubeAnalyticsAPI:
                 result["error_lifetime"] = channel_stats["error"]
             else:
                 _LOGGER.info("async_get_all_metrics: Successfully fetched channel statistics")
-                result["subscriber_count"] = channel_stats.get("subscriber_count", 0)
-                result["video_count"] = channel_stats.get("video_count", 0)
-                result["view_count"] = channel_stats.get("view_count", 0)
-                result["channel_title"] = channel_stats.get("channel_title", "Unknown")
+                result["subscriber_count_lifetime"] = channel_stats.get("subscriber_count", 0)
+                result["video_count_lifetime"] = channel_stats.get("video_count", 0)
+                result["view_count_lifetime"] = channel_stats.get("view_count", 0)
+            
+            # Fetch recent videos statistics
+            _LOGGER.info("async_get_all_metrics: Fetching recent videos statistics")
+            recent_videos = await self.async_get_recent_videos_stats()
+            
+            if "error" in recent_videos:
+                _LOGGER.error("async_get_all_metrics: Error fetching recent videos: %s", recent_videos["error"])
+                result["error_10vids"] = recent_videos["error"]
+            else:
+                _LOGGER.info("async_get_all_metrics: Successfully fetched recent videos statistics")
+                result.update(recent_videos)
             
             result["last_updated"] = datetime.now().isoformat()
             _LOGGER.info("async_get_all_metrics: Completed successfully")
