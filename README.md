@@ -127,4 +127,4 @@ Home Assistant integration for displaying YouTube Studio Analytics data as nativ
 ## About
 Home Assistant integration for YouTube Studio Analytics. Supports both personal and brand channels with automatic data updates.
 
-Support me [here](https://summersketches.com/product/support-me/)
+Support me [here](https://kattcrazy.nz/product/support-me/)
